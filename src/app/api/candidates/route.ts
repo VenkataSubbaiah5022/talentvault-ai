@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { filterCandidates, getAllCandidates } from "@/lib/search/candidates";
+import {
+  filterCandidates,
+  getAllCandidates,
+  sortCandidates,
+} from "@/lib/search/candidates";
 import type { CandidateFilters } from "@/types/candidate";
 
 export const runtime = "nodejs";
@@ -14,13 +18,31 @@ export async function GET(request: Request) {
         ? Number(searchParams.get("minYears"))
         : undefined,
       location: searchParams.get("location") ?? undefined,
+      jobTitle: searchParams.get("jobTitle") ?? undefined,
     };
 
     const includeAll = searchParams.get("all") === "true";
-    const all = await getAllCandidates();
-    const candidates = includeAll ? all : filterCandidates(all, filters);
+    const browse = searchParams.get("browse") === "true";
+    const sort = (searchParams.get("sort") as "recent" | "name" | "experience") ?? "recent";
 
-    return NextResponse.json({ candidates, total: candidates.length });
+    const all = await getAllCandidates();
+    let candidates = includeAll
+      ? all
+      : filterCandidates(all, filters, { completedOnly: !browse });
+
+    if (!includeAll) {
+      candidates = sortCandidates(candidates, sort);
+    }
+
+    const readyCount = candidates.filter(
+      (c) => c.processing_status === "completed",
+    ).length;
+
+    return NextResponse.json({
+      candidates,
+      total: candidates.length,
+      readyCount,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to fetch";
     return NextResponse.json({ error: message }, { status: 500 });

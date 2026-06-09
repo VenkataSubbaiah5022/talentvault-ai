@@ -2,21 +2,33 @@ import { Briefcase, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { StatusBadge } from "@/components/candidates/status-badge";
+import { HireStatusBadge } from "@/components/candidates/hire-status-badge";
 import type { Candidate } from "@/types/candidate";
 import { getInitials } from "@/lib/utils/initials";
+import { cn } from "@/lib/utils";
 
 interface CandidateCardProps {
   candidate: Candidate;
   onClick: () => void;
+  selected?: boolean;
 }
 
-export function CandidateCard({ candidate, onClick }: CandidateCardProps) {
+export function CandidateCard({
+  candidate,
+  onClick,
+  selected,
+}: CandidateCardProps) {
   const displayName = candidate.name ?? candidate.original_filename;
   const skills = (candidate.skills ?? []).slice(0, 4);
 
   return (
-    <Card className="surface-card-hover group cursor-pointer" onClick={onClick}>
+    <Card
+      className={cn(
+        "surface-card-hover group cursor-pointer",
+        selected && "ring-2 ring-[#7C3AED]/40",
+      )}
+      onClick={onClick}
+    >
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start gap-3">
           <Avatar className="h-11 w-11 border border-border/60">
@@ -37,7 +49,7 @@ export function CandidateCard({ candidate, onClick }: CandidateCardProps) {
                   </p>
                 )}
               </div>
-              <StatusBadge status={candidate.processing_status} />
+              <HireStatusBadge status={candidate.processing_status} />
             </div>
           </div>
         </div>

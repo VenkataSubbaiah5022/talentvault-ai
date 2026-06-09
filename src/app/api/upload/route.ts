@@ -16,8 +16,11 @@ export async function POST(request: Request) {
 
     await ensureResumesBucket();
 
+    const autoProcess = formData.get("autoProcess") !== "false";
+
     const supabase = createServerClient();
     const createdIds: string[] = [];
+    const uploadedFiles: { id: string; filename: string; size: number }[] = [];
     const uploadErrors: string[] = [];
 
     for (const file of files) {
@@ -57,6 +60,11 @@ export async function POST(request: Request) {
       }
 
       createdIds.push(row.id);
+      uploadedFiles.push({
+        id: row.id,
+        filename: file.name,
+        size: buffer.length,
+      });
     }
 
     if (!createdIds.length) {
@@ -74,13 +82,15 @@ export async function POST(request: Request) {
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin;
 
-    for (const id of createdIds) {
-      fetch(`${baseUrl}/api/process/${id}`, { method: "POST" }).catch(
-        console.error,
-      );
+    if (autoProcess) {
+      for (const id of createdIds) {
+        fetch(`${baseUrl}/api/process/${id}`, { method: "POST" }).catch(
+          console.error,
+        );
+      }
     }
 
-    return NextResponse.json({ ids: createdIds });
+    return NextResponse.json({ ids: createdIds, files: uploadedFiles });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed";
     const status = message.includes("SUPABASE_SERVICE_ROLE_KEY") ? 503 : 500;

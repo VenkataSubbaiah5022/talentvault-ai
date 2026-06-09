@@ -1,130 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowRight, Shield, Sparkles, Upload, Users, Zap } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useCallback, useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PageHeader } from "@/components/layout/page-header";
-import { StatsCards } from "@/components/dashboard/stats-cards";
-import type { DashboardStats } from "@/types/candidate";
-import { cn } from "@/lib/utils";
+import { DashboardHero } from "@/components/dashboard/dashboard-hero";
+import { MetricCards } from "@/components/dashboard/metric-cards";
+import { TalentDistribution } from "@/components/dashboard/talent-distribution";
+import { ExperienceDonut } from "@/components/dashboard/experience-donut";
+import { TopSkillsPanel } from "@/components/dashboard/top-skills-panel";
+import { RecentAdditions } from "@/components/dashboard/recent-additions";
+import { AIInsightsCard } from "@/components/dashboard/ai-insights-card";
+import { ProcessingPipelineCard } from "@/components/dashboard/processing-pipeline-card";
+import { DashboardEmpty } from "@/components/dashboard/dashboard-empty";
+import { CandidateDrawer } from "@/components/candidates/candidate-drawer";
+import type { Candidate, DashboardInsights } from "@/types/candidate";
 
-const features = [
-  {
-    icon: Shield,
-    title: "PII-safe extraction",
-    description: "Contact details never reach the AI model.",
-  },
-  {
-    icon: Sparkles,
-    title: "Smart parsing",
-    description: "Skills, experience, and summaries from Gemini.",
-  },
-  {
-    icon: Zap,
-    title: "Instant search",
-    description: "Filter your vault by skills, location, and years.",
-  },
-];
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5">
+      <Skeleton className="h-[88px] rounded-[14px]" />
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-[148px] rounded-[14px]" />
+        ))}
+      </div>
+      <div className="grid gap-5 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-[340px] rounded-[14px]" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function DashboardView() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [insights, setInsights] = useState<DashboardInsights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Candidate | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/stats")
       .then((r) => r.json())
       .then((data) => {
-        setStats(data);
+        setInsights(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
+  const openCandidate = useCallback(async (id: string) => {
+    try {
+      const res = await fetch("/api/candidates?all=true");
+      const data = await res.json();
+      const candidate = (data.candidates as Candidate[])?.find(
+        (c) => c.id === id,
+      );
+      if (candidate) {
+        setSelected(candidate);
+        setDrawerOpen(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const isEmpty = insights?.pipeline.total === 0;
+
   return (
-    <div className="space-y-10">
-      <PageHeader
-        title="Dashboard"
-        description="Your talent pool at a glance — upload resumes, track processing, and find the right people in seconds."
-      />
-
+    <div className="mx-auto max-w-[1280px] space-y-5">
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
-          ))}
-        </div>
-      ) : (
-        stats && <StatsCards stats={stats} />
-      )}
+        <DashboardSkeleton />
+      ) : isEmpty ? (
+        <DashboardEmpty />
+      ) : insights ? (
+        <>
+          <DashboardHero
+            totalCandidates={insights.totalCandidates}
+            skillsIndexed={insights.skillsIndexed}
+            lastUploadAt={insights.lastUploadAt}
+          />
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {features.map(({ icon: Icon, title, description }) => (
-          <div
-            key={title}
-            className="flex gap-4 rounded-xl border border-border/60 bg-muted/30 p-4"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Icon className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-medium">{title}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-            </div>
+          <MetricCards insights={insights} />
+
+          <div className="grid gap-5 lg:grid-cols-3">
+            <TalentDistribution items={insights.roleDistribution} />
+            <ExperienceDonut
+              bands={insights.experienceBands}
+              total={insights.totalCandidates}
+            />
+            <TopSkillsPanel skills={insights.topSkills} />
           </div>
-        ))}
-      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="surface-card-hover group">
-          <CardContent className="space-y-5 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              <Upload className="h-6 w-6" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Upload resumes</h3>
-              <p className="text-sm text-muted-foreground">
-                Drop PDF or Word files in bulk. We extract skills and experience
-                while keeping contact details private from AI.
-              </p>
-            </div>
-            <Link
-              href="/upload"
-              className={cn(buttonVariants(), "inline-flex w-full sm:w-auto")}
-            >
-              Go to upload
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </CardContent>
-        </Card>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <RecentAdditions
+              candidates={insights.recentCandidates}
+              onSelect={openCandidate}
+            />
+            <AIInsightsCard insights={insights.aiInsights} />
+            <ProcessingPipelineCard pipeline={insights.pipeline} />
+          </div>
+        </>
+      ) : null}
 
-        <Card className="surface-card-hover group">
-          <CardContent className="space-y-5 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-              <Users className="h-6 w-6" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">Browse candidates</h3>
-              <p className="text-sm text-muted-foreground">
-                Search by skills, title, or location. Open any profile in a drawer
-                for full contact and skill details.
-              </p>
-            </div>
-            <Link
-              href="/candidates"
-              className={cn(
-                buttonVariants({ variant: "outline" }),
-                "inline-flex w-full sm:w-auto",
-              )}
-            >
-              View candidates
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <CandidateDrawer
+        candidate={selected}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

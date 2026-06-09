@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -49,13 +49,21 @@
 }
 
 :root {
+  --brand: #6366f1;
+  --brand-dark: #4f46e5;
+  --dashboard-bg: #f0f2f8;
+  --dashboard-card: #ffffff;
+  --dashboard-border: #e8ecf3;
+  --dashboard-text: #0f172a;
+  --dashboard-muted: #64748b;
+  --sidebar-bg: #1e1b4b;
   --background: oklch(0.985 0.004 275);
   --foreground: oklch(0.18 0.02 275);
   --card: oklch(1 0.002 275);
   --card-foreground: oklch(0.18 0.02 275);
   --popover: oklch(1 0.002 275);
   --popover-foreground: oklch(0.18 0.02 275);
-  --primary: oklch(0.52 0.19 275);
+  --primary: #6366f1;
   --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.96 0.01 275);
   --secondary-foreground: oklch(0.28 0.04 275);
@@ -122,10 +130,15 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground text-[14px] leading-relaxed;
   }
   html {
     @apply font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight text-[#0f172a] dark:text-foreground;
   }
 }
 
@@ -168,5 +181,13 @@
 
   .surface-card-hover {
     @apply rounded-xl border border-border/60 bg-card shadow-sm transition-all duration-200 hover:border-primary/25 hover:shadow-md;
+  }
+
+  .dashboard-grid {
+    @apply grid gap-5;
+  }
+
+  .text-dashboard-muted {
+    color: var(--dashboard-muted);
   }
 }

@@ -12,7 +12,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -38,6 +38,7 @@ export function ThemeToggle() {
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon" }),
           "h-9 w-9 text-muted-foreground hover:text-foreground",
+          className,
         )}
         aria-label="Toggle theme"
       >

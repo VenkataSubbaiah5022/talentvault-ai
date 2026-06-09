@@ -20,11 +20,57 @@ export interface Candidate {
   error_message: string | null;
 }
 
-export interface DashboardStats {
+export interface RankedItem {
+  label: string;
+  count: number;
+}
+
+export interface RecentCandidateSummary {
+  id: string;
+  name: string;
+  recent_job_title: string | null;
+  location: string | null;
+  years_experience: number | null;
+  skills: string[];
+  created_at: string;
+}
+
+export interface AITalentInsights {
+  mostCommonSkill: string | null;
+  largestTalentPool: string | null;
+  averageSeniority: string | null;
+  fastestGrowingLocation: string | null;
+  recommendation: string;
+}
+
+export interface DashboardInsights {
   totalCandidates: number;
+  readyToHire: number;
+  readyToHirePercent: number;
   averageExperience: number;
-  topSkill: string | null;
-  topLocation: string | null;
+  locationsCovered: number;
+  countriesCovered: number;
+  candidatesThisWeek: number;
+  skillsIndexed: number;
+  lastUploadAt: string | null;
+  pipeline: {
+    completed: number;
+    pending: number;
+    processing: number;
+    failed: number;
+    total: number;
+  };
+  experienceBands: {
+    junior: number;
+    mid: number;
+    senior: number;
+    unknown: number;
+  };
+  roleDistribution: RankedItem[];
+  topSkills: RankedItem[];
+  topLocations: RankedItem[];
+  recentCandidates: RecentCandidateSummary[];
+  aiInsights: AITalentInsights;
 }
 
 export interface CandidateFilters {
@@ -32,7 +78,10 @@ export interface CandidateFilters {
   skill?: string;
   minYears?: number;
   location?: string;
+  jobTitle?: string;
 }
+
+export type CandidateSort = "recent" | "name" | "experience";
 
 export interface AIExtractionResult {
   skills: string[];

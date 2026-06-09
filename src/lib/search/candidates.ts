@@ -36,8 +36,12 @@ function candidateMatchesToken(candidate: Candidate, token: string): boolean {
 export function filterCandidates(
   candidates: Candidate[],
   filters: CandidateFilters,
+  options?: { completedOnly?: boolean },
 ): Candidate[] {
-  let result = candidates.filter((c) => c.processing_status === "completed");
+  let result =
+    options?.completedOnly === false
+      ? [...candidates]
+      : candidates.filter((c) => c.processing_status === "completed");
 
   if (filters.query) {
     const tokens = tokenizeQuery(filters.query);
@@ -68,7 +72,38 @@ export function filterCandidates(
     );
   }
 
+  if (filters.jobTitle) {
+    const title = filters.jobTitle.toLowerCase();
+    result = result.filter((c) =>
+      (c.recent_job_title ?? "").toLowerCase().includes(title),
+    );
+  }
+
   return result;
+}
+
+export function sortCandidates(
+  candidates: Candidate[],
+  sort: "recent" | "name" | "experience",
+): Candidate[] {
+  const sorted = [...candidates];
+  switch (sort) {
+    case "name":
+      return sorted.sort((a, b) =>
+        (a.name ?? a.original_filename).localeCompare(
+          b.name ?? b.original_filename,
+        ),
+      );
+    case "experience":
+      return sorted.sort(
+        (a, b) => (b.years_experience ?? 0) - (a.years_experience ?? 0),
+      );
+    default:
+      return sorted.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+  }
 }
 
 export async function getAllCandidates(
