@@ -9,6 +9,7 @@ import { CandidateTableView } from "@/components/candidates/candidate-table-view
 import { CandidateDetailPanel } from "@/components/candidates/candidate-detail-panel";
 import { CandidateCard } from "@/components/candidates/candidate-card";
 import { EmptyState } from "@/components/candidates/empty-state";
+import { useRecruiterPreferences } from "@/hooks/use-recruiter-preferences";
 import type { Candidate, CandidateSort } from "@/types/candidate";
 
 export function CandidatesView() {
@@ -16,18 +17,25 @@ export function CandidatesView() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [readyCount, setReadyCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"cards" | "table">("table");
+  const { preferences } = useRecruiterPreferences();
+  const [view, setView] = useState<"cards" | "table">(preferences.defaultView);
   const [selected, setSelected] = useState<Candidate | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(8);
-  const [sort, setSort] = useState<CandidateSort>("recent");
+  const [rowsPerPage, setRowsPerPage] = useState(preferences.rowsPerPage);
+  const [sort, setSort] = useState<CandidateSort>(preferences.defaultSort);
 
   const [query, setQuery] = useState("");
   const [skill, setSkill] = useState("");
   const [minYears, setMinYears] = useState("");
   const [location, setLocation] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+
+  useEffect(() => {
+    setView(preferences.defaultView);
+    setSort(preferences.defaultSort);
+    setRowsPerPage(preferences.rowsPerPage);
+  }, [preferences.defaultView, preferences.defaultSort, preferences.rowsPerPage]);
 
   useEffect(() => {
     setSkill(searchParams.get("skill") ?? "");
@@ -48,16 +56,21 @@ export function CandidatesView() {
 
     const res = await fetch(`/api/candidates?${params}`);
     const data = await res.json();
-    const list = (data.candidates ?? []) as Candidate[];
+    let list = (data.candidates ?? []) as Candidate[];
+    if (preferences.readyToHireOnly) {
+      list = list.filter((c) => c.processing_status === "completed");
+    }
     setCandidates(list);
-    setReadyCount(data.readyCount ?? 0);
+    setReadyCount(
+      list.filter((c) => c.processing_status === "completed").length,
+    );
     setLoading(false);
 
     setSelected((prev) =>
       prev && list.some((c) => c.id === prev.id) ? prev : null,
     );
     setPage(1);
-  }, [query, skill, minYears, location, jobTitle, sort]);
+  }, [query, skill, minYears, location, jobTitle, sort, preferences.readyToHireOnly]);
 
   const handleSelect = (candidate: Candidate) => {
     setSelected((prev) =>

@@ -10,6 +10,7 @@ import {
   type UploadFileItem,
 } from "@/components/upload/upload-files-table";
 import { UploadSidebar } from "@/components/upload/upload-sidebar";
+import { loadPreferences } from "@/lib/settings/preferences";
 import type { Candidate, ProcessingStatus } from "@/types/candidate";
 
 function mapCandidate(c: Candidate, sizes: Record<string, number>): UploadFileItem {
@@ -117,7 +118,8 @@ export function UploadView() {
     setIsUploading(true);
     const formData = new FormData();
     files.forEach((f) => formData.append("files", f));
-    formData.append("autoProcess", "false");
+    const autoProcess = loadPreferences().autoProcessUploads;
+    formData.append("autoProcess", autoProcess ? "true" : "false");
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
@@ -142,7 +144,15 @@ export function UploadView() {
       }));
 
       setItems((prev) => [...newItems, ...prev]);
-      toast.success(`Uploaded ${uploaded.length} file(s)`);
+      if (autoProcess) {
+        setIsProcessing(true);
+        startPolling();
+        toast.success(
+          `Uploaded ${uploaded.length} file(s) — processing started`,
+        );
+      } else {
+        toast.success(`Uploaded ${uploaded.length} file(s)`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {

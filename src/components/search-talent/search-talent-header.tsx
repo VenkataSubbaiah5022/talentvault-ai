@@ -1,23 +1,34 @@
 import Link from "next/link";
-import { Bell, Upload } from "lucide-react";
+import { Bell, Bookmark, Upload } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { IconActionButton } from "@/components/dashboard/icon-badge";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
 
-export function CandidatesPageHeader() {
+export function SearchTalentHeader() {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="space-y-1">
         <h1 className="text-[26px] font-semibold tracking-tight text-[#0f172a] dark:text-foreground">
-          All Candidates
+          Search Talent
         </h1>
-        <p className="text-[14px] text-[#64748b] dark:text-muted-foreground">
-          Search, filter and manage every profile in your talent vault.
+        <p className="max-w-xl text-[14px] text-[#64748b] dark:text-muted-foreground">
+          Find the right candidates in your vault. Use filters or natural search
+          to discover talent.
         </p>
       </div>
 
       <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "h-10 rounded-lg border-[#e2e8f0] px-4 text-[13px] text-[#64748b]",
+          )}
+        >
+          <Bookmark className="mr-1.5 h-4 w-4" />
+          Save Search
+        </button>
         <Link
           href="/upload"
           className={cn(
