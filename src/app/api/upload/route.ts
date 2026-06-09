@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSupportedResumeFile } from "@/lib/extract/text";
 import { createServerClient, RESUMES_BUCKET } from "@/lib/supabase/server";
+import { ensureResumesBucket } from "@/lib/supabase/storage";
 
 export const runtime = "nodejs";
 
@@ -13,8 +14,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
     }
 
+    await ensureResumesBucket();
+
     const supabase = createServerClient();
     const createdIds: string[] = [];
+    const uploadErrors: string[] = [];
 
     for (const file of files) {
       if (!isSupportedResumeFile(file.name)) {
@@ -33,6 +37,7 @@ export async function POST(request: Request) {
 
       if (uploadError) {
         console.error("Storage upload failed:", uploadError.message);
+        uploadErrors.push(`${file.name}: ${uploadError.message}`);
         continue;
       }
 
@@ -55,10 +60,15 @@ export async function POST(request: Request) {
     }
 
     if (!createdIds.length) {
-      return NextResponse.json(
-        { error: "No valid resume files were uploaded" },
-        { status: 400 },
+      const bucketMissing = uploadErrors.some((e) =>
+        e.toLowerCase().includes("bucket not found"),
       );
+      const error = bucketMissing
+        ? `Supabase Storage bucket "${RESUMES_BUCKET}" does not exist. Create it in Supabase Dashboard → Storage → New bucket (name: resumes), or run supabase/migrations/002_storage_bucket.sql`
+        : uploadErrors[0] ??
+          "No valid resume files were uploaded. Use PDF or DOCX.";
+
+      return NextResponse.json({ error, details: uploadErrors }, { status: 400 });
     }
 
     const baseUrl =
@@ -73,6 +83,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ids: createdIds });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = message.includes("SUPABASE_SERVICE_ROLE_KEY") ? 503 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

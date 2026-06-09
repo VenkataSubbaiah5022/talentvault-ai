@@ -42,7 +42,9 @@ npm install
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run `supabase/migrations/001_candidates.sql` in the SQL Editor
-3. Create a Storage bucket named **`resumes`** (private is fine; service role accesses it)
+3. **Create the Storage bucket** (required — uploads fail without this):
+   - **Option A (UI):** Dashboard → **Storage** → **New bucket** → Name: `resumes` → Private → Create
+   - **Option B (SQL):** Run `supabase/migrations/002_storage_bucket.sql` in the SQL Editor
 4. Copy project URL and keys
 
 ### 3. Gemini API key
