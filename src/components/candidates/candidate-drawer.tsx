@@ -16,10 +16,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "@/components/candidates/status-badge";
 import type { Candidate } from "@/types/candidate";
+import { getInitials } from "@/lib/utils/initials";
 
 interface CandidateDrawerProps {
   candidate: Candidate | null;
@@ -70,22 +72,33 @@ export function CandidateDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-            <SheetTitle className="text-xl">{displayName}</SheetTitle>
-            <StatusBadge status={candidate.processing_status} />
+      <SheetContent className="w-full overflow-y-auto border-l border-border/60 sm:max-w-lg">
+        <SheetHeader className="space-y-4 border-b border-border/60 pb-5">
+          <div className="flex items-start gap-4">
+            <Avatar className="h-14 w-14 border border-border/60">
+              <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
+                {getInitials(displayName)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <SheetTitle className="text-xl">{displayName}</SheetTitle>
+                <StatusBadge status={candidate.processing_status} />
+              </div>
+              <SheetDescription className="text-sm">
+                {candidate.recent_job_title ?? "Candidate profile"}
+              </SheetDescription>
+            </div>
           </div>
-          <SheetDescription>
-            {candidate.recent_job_title ?? "Candidate profile"}
-          </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6 px-4 pb-6">
+        <div className="mt-6 space-y-6 px-1 pb-6">
           {candidate.resume_summary && (
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {candidate.resume_summary}
-            </p>
+            <div className="rounded-xl bg-muted/40 p-4">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {candidate.resume_summary}
+              </p>
+            </div>
           )}
 
           <div className="flex flex-wrap gap-2">
@@ -110,7 +123,7 @@ export function CandidateDrawer({
 
           <Separator />
 
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-xl border border-border/60 p-4">
             <h4 className="text-sm font-semibold">Contact</h4>
             {candidate.email && (
               <ContactRow
@@ -159,7 +172,7 @@ export function CandidateDrawer({
 
           <Separator />
 
-          <div className="space-y-3">
+          <div className="space-y-3 rounded-xl border border-border/60 p-4">
             <h4 className="text-sm font-semibold">Skills</h4>
             <div className="flex flex-wrap gap-1.5">
               {(candidate.skills ?? []).map((skill) => (

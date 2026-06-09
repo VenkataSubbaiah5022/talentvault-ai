@@ -8,42 +8,30 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ variant }: EmptyStateProps) {
-  if (variant === "no-candidates") {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-16 text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-          <Upload className="h-7 w-7 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold">No candidates yet</h3>
-        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-          Upload resumes to build your talent pool. We&apos;ll extract skills,
-          experience, and contact details automatically.
-        </p>
-        <Link
-          href="/upload"
-          className={cn(buttonVariants(), "mt-6 inline-flex")}
-        >
-          Upload resumes
-        </Link>
-      </div>
-    );
-  }
+  const isNoCandidates = variant === "no-candidates";
+  const Icon = isNoCandidates ? Upload : FileSearch;
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/20 px-6 py-16 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-        <FileSearch className="h-7 w-7 text-muted-foreground" />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-muted/20 px-6 py-20 text-center">
+      <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <Icon className="h-8 w-8" />
       </div>
-      <h3 className="text-lg font-semibold">No candidates found</h3>
-      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        Try another skill, location, or experience filter — or upload more
-        resumes to expand your pool.
+      <h3 className="text-xl font-semibold">
+        {isNoCandidates ? "No candidates yet" : "No candidates found"}
+      </h3>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+        {isNoCandidates
+          ? "Upload resumes to build your talent pool. We'll extract skills, experience, and contact details automatically."
+          : "Try another skill, location, or experience filter — or upload more resumes to expand your pool."}
       </p>
       <Link
         href="/upload"
-        className={cn(buttonVariants({ variant: "outline" }), "mt-6 inline-flex")}
+        className={cn(
+          buttonVariants({ variant: isNoCandidates ? "default" : "outline" }),
+          "mt-8 inline-flex",
+        )}
       >
-        Upload more resumes
+        {isNoCandidates ? "Upload resumes" : "Upload more resumes"}
       </Link>
     </div>
   );

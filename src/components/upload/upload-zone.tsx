@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { FileText, Loader2, Upload, X } from "lucide-react";
+import { FileText, Loader2, Shield, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/candidates/status-badge";
 import type { Candidate, ProcessingStatus } from "@/types/candidate";
@@ -16,6 +16,12 @@ interface UploadItem {
   status: ProcessingStatus;
   error?: string;
 }
+
+const steps = [
+  { icon: Upload, label: "Upload files" },
+  { icon: Shield, label: "Scrub PII" },
+  { icon: Sparkles, label: "AI extraction" },
+];
 
 export function UploadZone() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -136,6 +142,20 @@ export function UploadZone() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
+        {steps.map(({ icon: Icon, label }, i) => (
+          <div key={label} className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              <Icon className="h-3.5 w-3.5 text-primary" />
+              {label}
+            </div>
+            {i < steps.length - 1 && (
+              <span className="hidden text-muted-foreground/50 sm:inline">→</span>
+            )}
+          </div>
+        ))}
+      </div>
+
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -149,10 +169,10 @@ export function UploadZone() {
         }}
         onClick={() => inputRef.current?.click()}
         className={cn(
-          "cursor-pointer rounded-xl border-2 border-dashed p-12 text-center transition-colors",
+          "surface-card cursor-pointer border-2 border-dashed p-12 text-center transition-all",
           isDragging
-            ? "border-primary bg-primary/5"
-            : "border-border/80 hover:border-primary/40 hover:bg-muted/30",
+            ? "border-primary bg-primary/5 scale-[1.01] shadow-lg shadow-primary/10"
+            : "hover:border-primary/40 hover:bg-muted/20",
         )}
       >
         <input
@@ -163,36 +183,41 @@ export function UploadZone() {
           className="hidden"
           onChange={(e) => e.target.files && handleFiles(e.target.files)}
         />
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-          <Upload className="h-7 w-7 text-primary" />
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Upload className="h-8 w-8" />
         </div>
-        <h3 className="text-lg font-semibold">Drop resumes here</h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          PDF or Word — multiple files supported. PII is scrubbed before AI
-          processing.
+        <h3 className="text-xl font-semibold">Drop resumes here</h3>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          PDF or Word — multiple files supported. Contact details are scrubbed
+          before any AI processing.
+        </p>
+        <p className="mt-4 text-xs text-muted-foreground">
+          or click to browse files
         </p>
       </div>
 
       {selectedFiles.length > 0 && (
-        <Card className="border-border/60">
-          <CardContent className="space-y-3 pt-6">
-            <p className="text-sm font-medium">
-              {selectedFiles.length} file(s) ready to upload
-            </p>
+        <Card className="surface-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Ready to process ({selectedFiles.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
             <ul className="space-y-2">
               {selectedFiles.map((file, i) => (
                 <li
                   key={`${file.name}-${i}`}
-                  className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-sm"
                 >
-                  <span className="flex items-center gap-2 truncate">
-                    <FileText className="h-4 w-4 shrink-0" />
-                    {file.name}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <FileText className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="truncate">{file.name}</span>
                   </span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeFile(i);
@@ -218,25 +243,30 @@ export function UploadZone() {
       )}
 
       {items.length > 0 && (
-        <Card className="border-border/60">
-          <CardContent className="space-y-4 pt-6">
+        <Card className="surface-card">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Processing progress</p>
+              <CardTitle className="text-base">Processing progress</CardTitle>
               <span className="text-sm text-muted-foreground">
                 {completed} / {total} completed
               </span>
             </div>
-            <Progress value={progressPct} />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Progress value={progressPct} className="h-2" />
             <ul className="space-y-2">
               {items.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2.5 text-sm"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5 text-sm"
                 >
-                  <span className="truncate">{item.filename}</span>
-                  <div className="flex items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2 truncate">
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    {item.filename}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
                     {item.error && (
-                      <span className="max-w-[120px] truncate text-xs text-destructive">
+                      <span className="max-w-[140px] truncate text-xs text-destructive">
                         {item.error}
                       </span>
                     )}

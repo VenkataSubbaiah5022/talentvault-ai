@@ -1,15 +1,13 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { UploadZone } from "@/components/upload/upload-zone";
 
 export default function UploadPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Upload resumes</h1>
-        <p className="mt-1 text-muted-foreground">
-          Add candidates to your vault. Files are stored securely; PII is
-          scrubbed before any AI processing.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Upload resumes"
+        description="Add candidates to your vault. Files are stored securely; PII is scrubbed before any AI processing."
+      />
       <UploadZone />
     </div>
   );
