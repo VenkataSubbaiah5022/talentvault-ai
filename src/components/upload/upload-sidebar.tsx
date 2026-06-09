@@ -9,6 +9,7 @@ import {
   XCircle,
   Cog,
 } from "lucide-react";
+import { UPLOAD_LIMITS } from "@/lib/upload/limits";
 import type { ProcessingStatus } from "@/types/candidate";
 
 interface UploadSidebarProps {
@@ -133,6 +134,17 @@ export function UploadSidebar({ stats, total }: UploadSidebarProps) {
             </li>
           ))}
         </ol>
+      </div>
+
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+        <h3 className="text-[14px] font-semibold text-blue-900 dark:text-blue-200">
+          Free API limits
+        </h3>
+        <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-blue-800 dark:text-blue-300">
+          <li>Max {UPLOAD_LIMITS.maxFilesPerUpload} resumes per upload</li>
+          <li>Max {UPLOAD_LIMITS.maxAiRequestsPerDay} AI extractions per day</li>
+          <li>Google Gemini free tier (assignment demo)</li>
+        </ul>
       </div>
 
       <div className="rounded-xl border border-[#e8ecf4] bg-white p-4 shadow-sm dark:border-border/60 dark:bg-card">

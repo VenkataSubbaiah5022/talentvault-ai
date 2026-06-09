@@ -3,33 +3,46 @@
 import { useRef, useState } from "react";
 import { CloudUpload, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UPLOAD_LIMITS } from "@/lib/upload/limits";
 import { cn } from "@/lib/utils";
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const MAX_FILES = 50;
+import type { UploadQuotaInfo } from "@/components/upload/upload-quota-banner";
 
 interface UploadDropZoneProps {
   onFilesSelected: (files: File[]) => void;
   isUploading: boolean;
   disabled?: boolean;
+  quota: UploadQuotaInfo | null;
 }
 
 export function UploadDropZone({
   onFilesSelected,
   isUploading,
   disabled,
+  quota,
 }: UploadDropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  const maxFiles = quota?.maxFilesThisUpload ?? UPLOAD_LIMITS.maxFilesPerUpload;
+  const uploadDisabled = disabled || isUploading || maxFiles === 0;
+
   const validateAndEmit = (fileList: FileList | File[]) => {
+    if (maxFiles === 0) {
+      window.alert(
+        "Daily AI limit reached (20/day on Gemini free tier). Try again tomorrow.",
+      );
+      return;
+    }
+
     const files = Array.from(fileList).filter((f) =>
       /\.(pdf|docx|doc)$/i.test(f.name),
     );
 
     if (!files.length) return;
 
-    const oversized = files.filter((f) => f.size > MAX_FILE_SIZE);
+    const oversized = files.filter(
+      (f) => f.size > UPLOAD_LIMITS.maxFileSizeBytes,
+    );
     if (oversized.length) {
       window.alert(
         `Some files exceed 10MB: ${oversized.map((f) => f.name).join(", ")}`,
@@ -37,9 +50,10 @@ export function UploadDropZone({
       return;
     }
 
-    if (files.length > MAX_FILES) {
-      window.alert(`You can upload up to ${MAX_FILES} files at a time.`);
-      onFilesSelected(files.slice(0, MAX_FILES));
+    if (files.length > maxFiles) {
+      window.alert(
+        `Gemini free tier allows up to ${maxFiles} resume(s) per upload (${UPLOAD_LIMITS.maxFilesPerUpload} max per batch, ${quota?.remainingToday ?? UPLOAD_LIMITS.maxAiRequestsPerDay} remaining today). Please select fewer files.`,
+      );
       return;
     }
 
@@ -51,17 +65,18 @@ export function UploadDropZone({
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setIsDragging(true);
+          if (!uploadDisabled) setIsDragging(true);
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={(e) => {
           e.preventDefault();
           setIsDragging(false);
-          if (!disabled && !isUploading) validateAndEmit(e.dataTransfer.files);
+          if (!uploadDisabled) validateAndEmit(e.dataTransfer.files);
         }}
         className={cn(
           "border-b border-dashed border-[#e2e8f0] px-6 py-10 text-center transition-colors dark:border-border/60",
           isDragging && "bg-violet-50/50 dark:bg-violet-950/20",
+          uploadDisabled && "opacity-60",
         )}
       >
         <input
@@ -70,6 +85,7 @@ export function UploadDropZone({
           multiple
           accept=".pdf,.docx,.doc"
           className="hidden"
+          disabled={uploadDisabled}
           onChange={(e) => {
             if (e.target.files) validateAndEmit(e.target.files);
             e.target.value = "";
@@ -88,7 +104,7 @@ export function UploadDropZone({
         <Button
           type="button"
           variant="outline"
-          disabled={disabled || isUploading}
+          disabled={uploadDisabled}
           className="mt-4 h-10 rounded-lg border-[#7C3AED] px-5 text-[13px] font-medium text-[#7C3AED] hover:bg-violet-50"
           onClick={() => inputRef.current?.click()}
         >
@@ -96,8 +112,9 @@ export function UploadDropZone({
         </Button>
 
         <p className="mt-5 text-[12px] text-[#94a3b8]">
-          Supports PDF and DOCX files. Max file size: 10MB per file • Max 50
-          files at a time.
+          PDF or DOCX · Max 10MB per file · Max{" "}
+          <span className="font-medium text-[#64748b]">{maxFiles}</span> file
+          {maxFiles !== 1 ? "s" : ""} per upload (Gemini free tier)
         </p>
       </div>
 

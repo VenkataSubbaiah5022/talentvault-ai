@@ -1,7 +1,10 @@
 import { extractResumeData } from "@/lib/ai/gemini";
+import { isQuotaError } from "@/lib/ai/quota";
 import { extractContactDetails } from "@/lib/extract/contact";
+import { extractResumeDataFallback } from "@/lib/extract/fallback";
 import { scrubPII } from "@/lib/extract/pii";
 import { extractTextFromFile } from "@/lib/extract/text";
+import type { AIExtractionResult } from "@/types/candidate";
 import {
   createServerClient,
   RESUMES_BUCKET,
@@ -24,10 +27,31 @@ export async function processCandidate(candidateId: string): Promise<void> {
     return;
   }
 
-  await supabase
+  if (candidate.processing_status === "processing") {
+    const { data: reclaimed } = await supabase
+      .from("candidates")
+      .update({ processing_status: "pending", error_message: null })
+      .eq("id", candidateId)
+      .eq("processing_status", "processing")
+      .select("id")
+      .maybeSingle();
+
+    if (!reclaimed) {
+      return;
+    }
+  }
+
+  const { data: claimed } = await supabase
     .from("candidates")
     .update({ processing_status: "processing", error_message: null })
-    .eq("id", candidateId);
+    .eq("id", candidateId)
+    .in("processing_status", ["pending", "failed"])
+    .select("id")
+    .maybeSingle();
+
+  if (!claimed) {
+    return;
+  }
 
   try {
     if (!candidate.storage_path) {
@@ -50,7 +74,7 @@ export async function processCandidate(candidateId: string): Promise<void> {
 
     const contact = extractContactDetails(rawText);
     const scrubbedText = scrubPII(rawText);
-    const aiData = await extractResumeData(scrubbedText);
+    const aiData = await extractResumeFields(scrubbedText, contact);
 
     const { error: updateError } = await supabase
       .from("candidates")
@@ -83,5 +107,21 @@ export async function processCandidate(candidateId: string): Promise<void> {
       .eq("id", candidateId);
 
     throw err;
+  }
+}
+
+async function extractResumeFields(
+  scrubbedText: string,
+  contact: ReturnType<typeof extractContactDetails>,
+): Promise<AIExtractionResult> {
+  try {
+    return await extractResumeData(scrubbedText);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (isQuotaError(message)) {
+      return extractResumeDataFallback(scrubbedText, contact);
+    }
+    console.warn("Gemini extraction failed, using local fallback:", message);
+    return extractResumeDataFallback(scrubbedText, contact);
   }
 }

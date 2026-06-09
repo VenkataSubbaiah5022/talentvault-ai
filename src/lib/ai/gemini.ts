@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { isQuotaError, parseRetryDelayMs } from "@/lib/ai/quota";
+import { sleep } from "@/lib/utils/sleep";
 import type { AIExtractionResult } from "@/types/candidate";
 
-const MODEL_ID = "gemini-2.5-flash";
+const MODEL_ID = process.env.GEMINI_MODEL ?? "gemini-2.0-flash";
 
 const EXTRACTION_PROMPT = `You are a resume parsing assistant for recruiters. Extract structured data from the scrubbed resume text below.
 
@@ -48,8 +50,7 @@ export async function extractResumeData(
       ? scrubbedText.slice(0, 12000) + "\n...[truncated]"
       : scrubbedText;
 
-  const result = await model.generateContent(EXTRACTION_PROMPT + truncated);
-  const text = result.response.text();
+  const text = await generateWithRetry(model, EXTRACTION_PROMPT + truncated);
 
   let parsed: AIExtractionResult;
   try {
@@ -58,15 +59,48 @@ export async function extractResumeData(
     throw new Error("AI returned invalid JSON");
   }
 
-  if (!Array.isArray(parsed.skills) || parsed.skills.length === 0) {
-    throw new Error("AI extraction missing skills");
-  }
+  const skills = Array.isArray(parsed.skills)
+    ? parsed.skills.map((s) => String(s).trim()).filter(Boolean)
+    : [];
 
   return {
-    skills: parsed.skills.map((s) => String(s).trim()).filter(Boolean),
+    skills,
     years_experience: Number(parsed.years_experience) || 0,
     recent_job_title: String(parsed.recent_job_title || "Unknown").trim(),
     location: String(parsed.location || "Unknown").trim(),
     resume_summary: String(parsed.resume_summary || "").trim().slice(0, 300),
   };
+}
+
+function isRetryableGeminiError(err: unknown): boolean {
+  const message =
+    err instanceof Error ? err.message : String(err);
+  return (
+    isQuotaError(message) ||
+    message.toLowerCase().includes("503") ||
+    message.toLowerCase().includes("unavailable")
+  );
+}
+
+async function generateWithRetry(
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+  prompt: string,
+): Promise<string> {
+  const maxAttempts = 5;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt < maxAttempts - 1 && isRetryableGeminiError(err)) {
+        await sleep(parseRetryDelayMs(message, attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw new Error("AI request failed after retries");
 }

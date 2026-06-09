@@ -83,6 +83,8 @@ npm run generate:test-data
 
 Upload files from `test-data/resumes/` — 30 varied resumes across engineers, designers, PMs, sales, and operations.
 
+**Upload limits (Gemini free tier):** max **5 resumes per upload**, max **20 AI extractions per day**. The UI enforces these limits so reviewers can see this is a demo on the restricted free API — upload test data in batches (e.g. 4×5 files).
+
 ## PII handling
 
 ```

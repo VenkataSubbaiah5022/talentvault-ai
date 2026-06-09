@@ -9,6 +9,7 @@ import {
   getUploadProgress,
 } from "@/lib/upload/format";
 import { formatDistanceToNow } from "@/lib/utils/date";
+import { shortenErrorMessage } from "@/lib/ai/quota";
 import { cn } from "@/lib/utils";
 import type { ProcessingStatus } from "@/types/candidate";
 
@@ -52,7 +53,9 @@ export function UploadFilesTable({
   onRemoveAll,
   onStartProcessing,
 }: UploadFilesTableProps) {
-  const pendingCount = items.filter((i) => i.status === "pending").length;
+  const pendingCount = items.filter(
+    (i) => i.status === "pending" || i.status === "failed",
+  ).length;
 
   if (!items.length) return null;
 
@@ -98,7 +101,17 @@ export function UploadFilesTable({
                     {formatFileSize(item.size)}
                   </td>
                   <td className="px-4 py-3.5">
-                    <UploadStatusBadge status={item.status} />
+                    <div className="space-y-1">
+                      <UploadStatusBadge status={item.status} />
+                      {item.status === "failed" && item.error && (
+                        <p
+                          className="max-w-[180px] text-[11px] leading-snug text-red-600"
+                          title={item.error}
+                        >
+                          {shortenErrorMessage(item.error)}
+                        </p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2">

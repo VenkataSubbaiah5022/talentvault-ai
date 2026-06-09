@@ -6,10 +6,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UploadPageHeader } from "@/components/upload/upload-page-header";
 import { UploadDropZone } from "@/components/upload/upload-drop-zone";
 import {
+  UploadQuotaBanner,
+  type UploadQuotaInfo,
+} from "@/components/upload/upload-quota-banner";
+import {
   UploadFilesTable,
   type UploadFileItem,
 } from "@/components/upload/upload-files-table";
 import { UploadSidebar } from "@/components/upload/upload-sidebar";
+import { processCandidatesQueued } from "@/lib/process/client-queue";
 import { loadPreferences } from "@/lib/settings/preferences";
 import type { Candidate, ProcessingStatus } from "@/types/candidate";
 
@@ -29,60 +34,103 @@ export function UploadView() {
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [quota, setQuota] = useState<UploadQuotaInfo | null>(null);
   const fileSizesRef = useRef<Record<string, number>>({});
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeBatchRef = useRef<Set<string>>(new Set());
+  const pollCountRef = useRef(0);
+
+  const POLL_INTERVAL_MS = 3000;
+  const MAX_POLL_ITERATIONS = 120;
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    activeBatchRef.current.clear();
+    pollCountRef.current = 0;
   }, []);
 
-  const startPolling = useCallback(() => {
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch("/api/candidates?all=true");
-        const data = await res.json();
-        const candidates = (data.candidates ?? []) as Candidate[];
+  const refreshBatchItems = useCallback(
+    async (batchIds: Set<string>) => {
+      const res = await fetch("/api/candidates?all=true");
+      const data = await res.json();
+      const candidates = (data.candidates ?? []) as Candidate[];
 
-        setItems((prev) => {
-          const prevIds = new Set(prev.map((p) => p.id));
-          const updated = candidates
+      setItems((prev) => {
+        const prevIds = new Set(prev.map((p) => p.id));
+        const byId = new Map(
+          candidates
             .filter((c) => prevIds.has(c.id))
-            .sort(
-              (a, b) =>
-                new Date(b.created_at).getTime() -
-                new Date(a.created_at).getTime(),
-            )
-            .map((c) => mapCandidate(c, fileSizesRef.current));
+            .map((c) => [c.id, mapCandidate(c, fileSizesRef.current)]),
+        );
 
-          const stillRunning = updated.some(
-            (i) => i.status === "pending" || i.status === "processing",
-          );
+        const merged = prev.map((item) => byId.get(item.id) ?? item);
+        const batchItems = merged.filter((i) => batchIds.has(i.id));
+        const stillRunning = batchItems.some(
+          (i) => i.status === "pending" || i.status === "processing",
+        );
 
-          if (!stillRunning) {
-            stopPolling();
-            setIsProcessing(false);
-            const failed = updated.filter((i) => i.status === "failed").length;
-            const done = updated.filter(
-              (i) => i.status === "completed",
-            ).length;
-            if (failed > 0) {
-              toast.warning(`${done} completed, ${failed} failed`);
-            } else if (done > 0) {
-              toast.success(`${done} resumes processed successfully`);
-            }
+        if (!stillRunning && batchIds.size > 0) {
+          stopPolling();
+          setIsProcessing(false);
+          const failed = batchItems.filter((i) => i.status === "failed").length;
+          const done = batchItems.filter(
+            (i) => i.status === "completed",
+          ).length;
+          if (failed > 0) {
+            toast.warning(`${done} completed, ${failed} failed`);
+          } else if (done > 0) {
+            toast.success(`${done} resume(s) processed successfully`);
           }
+        }
 
-          return updated.length ? updated : prev;
-        });
-      } catch {
-        /* keep polling */
+        return merged;
+      });
+    },
+    [stopPolling],
+  );
+
+  const startPolling = useCallback(
+    (batchIds: string[]) => {
+      if (!batchIds.length) return;
+
+      stopPolling();
+      activeBatchRef.current = new Set(batchIds);
+      pollCountRef.current = 0;
+
+      pollRef.current = setInterval(async () => {
+        pollCountRef.current += 1;
+        if (pollCountRef.current > MAX_POLL_ITERATIONS) {
+          stopPolling();
+          setIsProcessing(false);
+          toast.warning(
+            "Stopped status checks — click Start Processing to retry if needed",
+          );
+          return;
+        }
+
+        try {
+          await refreshBatchItems(activeBatchRef.current);
+        } catch {
+          /* retry on next tick */
+        }
+      }, POLL_INTERVAL_MS);
+    },
+    [refreshBatchItems, stopPolling],
+  );
+
+  const loadQuota = useCallback(async () => {
+    try {
+      const res = await fetch("/api/upload/limits");
+      if (res.ok) {
+        setQuota(await res.json());
       }
-    }, 1500);
-  }, [stopPolling]);
+    } catch {
+      /* optional */
+    }
+  }, []);
 
   const loadFiles = useCallback(async () => {
     try {
@@ -97,22 +145,18 @@ export function UploadView() {
         .map((c) => mapCandidate(c, fileSizesRef.current));
 
       setItems(sorted);
-
-      if (sorted.some((i) => i.status === "processing")) {
-        setIsProcessing(true);
-        startPolling();
-      }
     } catch {
       toast.error("Could not load uploaded files");
     } finally {
       setLoading(false);
     }
-  }, [startPolling]);
+  }, []);
 
   useEffect(() => {
     loadFiles();
+    loadQuota();
     return () => stopPolling();
-  }, [loadFiles, stopPolling]);
+  }, [loadFiles, loadQuota, stopPolling]);
 
   const handleUpload = async (files: File[]) => {
     setIsUploading(true);
@@ -129,6 +173,8 @@ export function UploadView() {
         throw new Error(data.error ?? "Upload failed");
       }
 
+      await loadQuota();
+
       const uploaded: { id: string; filename: string; size: number }[] =
         data.files ?? [];
       uploaded.forEach((f) => {
@@ -144,14 +190,14 @@ export function UploadView() {
       }));
 
       setItems((prev) => [...newItems, ...prev]);
+      toast.success(`Uploaded ${uploaded.length} file(s)`);
+
       if (autoProcess) {
+        const batchIds = uploaded.map((f) => f.id);
         setIsProcessing(true);
-        startPolling();
-        toast.success(
-          `Uploaded ${uploaded.length} file(s) — processing started`,
-        );
-      } else {
-        toast.success(`Uploaded ${uploaded.length} file(s)`);
+        startPolling(batchIds);
+        await processCandidatesQueued(batchIds);
+        await refreshBatchItems(new Set(batchIds));
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -161,19 +207,23 @@ export function UploadView() {
   };
 
   const handleStartProcessing = async () => {
-    const pending = items.filter((i) => i.status === "pending");
+    const pending = items.filter(
+      (i) =>
+        i.status === "pending" ||
+        i.status === "failed" ||
+        i.status === "processing",
+    );
     if (!pending.length) return;
 
+    const batchIds = pending.map((item) => item.id);
     setIsProcessing(true);
+    startPolling(batchIds);
     try {
-      await Promise.all(
-        pending.map((item) =>
-          fetch(`/api/process/${item.id}`, { method: "POST" }),
-        ),
-      );
-      startPolling();
+      await processCandidatesQueued(batchIds);
+      await refreshBatchItems(new Set(batchIds));
     } catch {
       toast.error("Failed to start processing");
+      stopPolling();
       setIsProcessing(false);
     }
   };
@@ -193,6 +243,7 @@ export function UploadView() {
 
     setItems((prev) => prev.filter((i) => i.id !== id));
     delete fileSizesRef.current[id];
+    await loadQuota();
     toast.success("File removed");
   };
 
@@ -209,6 +260,7 @@ export function UploadView() {
 
     setItems([]);
     fileSizesRef.current = {};
+    await loadQuota();
     toast.success("All files removed");
   };
 
@@ -239,9 +291,11 @@ export function UploadView() {
     <div className="-mx-7 -my-7 flex min-h-[calc(100vh)]">
       <div className="flex min-w-0 flex-1 flex-col gap-5 px-7 py-7">
         <UploadPageHeader />
+        {quota && <UploadQuotaBanner quota={quota} />}
         <UploadDropZone
           onFilesSelected={handleUpload}
           isUploading={isUploading}
+          quota={quota}
         />
 
         {loading ? (
